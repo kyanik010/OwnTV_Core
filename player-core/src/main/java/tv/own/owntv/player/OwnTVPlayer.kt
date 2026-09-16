@@ -453,9 +453,13 @@ class OwnTVPlayer(
             android.os.Build.PRODUCT.contains("simulator")
     }
 
-    private var mpv: MPVLib? = null
-    private var initialized = false
+   private var mpv: MPVLib? = null
+private var initialized = false
 
+private val audioMixController = AudioMixController()
+
+@Volatile
+private var audioMixTrackId: Int? = null
     /**
      * The parts of [ensureInit] that belong to the player object rather than to an mpv core: the
      * logcat diagnostics tail and the `_error` → `_errorInfo` collector. A hard reset destroys the
