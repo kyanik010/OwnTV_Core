@@ -1,3 +1,4 @@
+# one-time AudioMix source patch
 name: Apply AudioMix Core Patch
 
 on:
@@ -13,23 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Patch OwnTVPlayer
         shell: python
         run: |
           from pathlib import Path
-          import re
-
           p = Path('player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt')
           s = p.read_text()
-
-          if 'fun audioMixEnable' in s:
-              print('AudioMix Core patch already present')
-          else:
+          if 'fun audioMixEnable' not in s:
               marker = 'private var audioDelaySec = 0.0'
-              if marker not in s:
-                  raise SystemExit('audio delay marker not found')
-
+              if marker not in s: raise SystemExit('audio delay marker not found')
               fields = '''private var audioMixOriginalAid: Int? = null
     private var audioMixExternalAid: Int? = null
     private var audioMixEnabled = false
@@ -37,30 +30,17 @@ jobs:
 
     '''
               s = s.replace(marker, fields + marker, 1)
-
               marker2 = '    fun selectAudio(mpvId: Int) {'
-              if marker2 not in s:
-                  raise SystemExit('selectAudio marker not found')
-
-              methods = r'''    /**
-     * Adds an IPTV stream as an external audio track to the CURRENT mpv session.
-     * The original audio id is discovered from track-list; no fixed mpv id is assumed.
-     */
-    fun audioMixEnable(url: String, headers: String? = null) {
+              if marker2 not in s: raise SystemExit('selectAudio marker not found')
+              methods = r'''    fun audioMixEnable(url: String, headers: String? = null) {
         if (url.isBlank()) return
         mpvAsync {
             val m = mpv ?: return@mpvAsync
             if (audioMixEnabled) audioMixDisableInternal()
-
             audioMixOriginalAid = m.getPropertyInt("aid")
             audioMixHeaders = headers
-
-            // Apply source-specific HTTP headers for the external request when supplied.
             headers?.takeIf { it.isNotBlank() }?.let { setPropertyString("http-header-fields", it) }
             command(arrayOf("audio-add", url, "select", "AudioMix", ""))
-
-            // audio-add is asynchronous in mpv. Wait for the track-list to expose the real id,
-            // then select it. Never assume the provider's audio track numbering.
             var externalId: Int? = null
             repeat(40) {
                 delay(100)
@@ -76,21 +56,15 @@ jobs:
                 }
                 if (externalId != null) return@repeat
             }
-
             val id = externalId ?: return@mpvAsync
             audioMixExternalAid = id
             audioMixEnabled = true
             setPropertyInt("aid", id)
-
-            // Do not leave the external source's temporary headers attached to the video stream.
             if (!headers.isNullOrBlank()) setPropertyString("http-header-fields", "")
         }
     }
 
-    /** Disable AudioMix, remove the discovered external track and restore the exact original aid. */
-    fun audioMixDisable() {
-        mpvAsync { audioMixDisableInternal() }
-    }
+    fun audioMixDisable() { mpvAsync { audioMixDisableInternal() } }
 
     private fun audioMixDisableInternal() {
         val m = mpv ?: return
@@ -106,9 +80,7 @@ jobs:
 
 '''
               s = s.replace(marker2, methods + marker2, 1)
-
           p.write_text(s)
-
       - name: Patch PlaybackEngine API
         shell: python
         run: |
@@ -117,9 +89,7 @@ jobs:
           s = p.read_text()
           if 'fun audioMixEnable' not in s:
               marker = '    fun selectAudio(id: Int)'
-              insert = '''    /** AudioMix: add a second IPTV stream as external audio in the current mpv session. */
-    fun audioMixEnable(url: String, headers: String? = null) {}
-    /** AudioMix: remove the external audio and restore the original audio track. */
+              insert = '''    fun audioMixEnable(url: String, headers: String? = null) {}
     fun audioMixDisable() {}
     val audioMixEnabled: StateFlow<Boolean> get() = FALSE_FLOW
 
@@ -132,17 +102,14 @@ jobs:
 '''
               s = s.replace(delegate, delegate_insert + delegate, 1)
           p.write_text(s)
-
-      - name: Verify source
-        run: |
-          grep -n "audioMixEnable\|audioMixDisable\|audioMixExternalAid" player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt player-core/src/main/java/tv/own/owntv/player/PlaybackEngine.kt
-
-      - name: Commit and remove one-time patch workflow
+      - name: Verify
+        run: grep -n "audioMixEnable\|audioMixDisable\|audioMixExternalAid" player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt player-core/src/main/java/tv/own/owntv/player/PlaybackEngine.kt
+      - name: Commit and remove workflow
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt player-core/src/main/java/tv/own/owntv/player/PlaybackEngine.kt .github/workflows/audiomix-core-patch.yml
-          git commit -m "Apply AudioMix Core Patch" || exit 0
+          git commit -m "Apply AudioMix Core Patch"
           git rm .github/workflows/audiomix-core-patch.yml
           git commit -m "Remove one-time AudioMix patch workflow"
           git push
