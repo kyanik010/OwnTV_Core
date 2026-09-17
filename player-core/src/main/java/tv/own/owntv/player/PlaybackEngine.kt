@@ -81,6 +81,9 @@ interface PlaybackEngine {
     fun adjustVolumeByUser(delta: Int) = adjustVolume(delta)
     fun toggleMute()
     fun retry()
+    val audioMixEnabled: StateFlow<Boolean> get() = FALSE_FLOW
+    fun audioMixEnable(url: String, headers: String? = null, userAgent: String? = null) {}
+    fun audioMixDisable() {}
     fun selectAudio(id: Int)
     fun selectSubtitle(id: Int)
     fun disableSubtitles()
@@ -188,6 +191,9 @@ class MpvPlaybackEngine(private val p: OwnTVPlayer) : PlaybackEngine {
     override fun adjustVolumeByUser(delta: Int) = p.adjustVolumeByUser(delta)
     override fun toggleMute() = p.toggleMute()
     override fun retry() = p.retry()
+    override val audioMixEnabled get() = p.audioMixEnabled
+    override fun audioMixEnable(url: String, headers: String?, userAgent: String?) = p.audioMixEnable(url, headers, userAgent)
+    override fun audioMixDisable() = p.audioMixDisable()
     override fun selectAudio(id: Int) = p.selectAudio(id)
     override fun selectSubtitle(id: Int) = p.selectSubtitle(id)
     override fun disableSubtitles() = p.disableSubtitles()

@@ -3860,7 +3860,7 @@
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	absolute
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	ac-3
 2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	ac3
-2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	aid
+6	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	aid
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	alac
 2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	alang
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	all=warn
@@ -3871,9 +3871,10 @@
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	ao
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	archive didn't start on hardware
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	attachSurface
-2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	audio
+3	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	audio
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	audio drained ${"%.1f".format(vfps / cfps)}× too fast
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	audio output produced no sound
+1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	audio-add
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	audio-bitrate
 3	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	audio-channels
 2	protocol	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	audio-codec-name
@@ -3883,6 +3884,7 @@
 2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	audio-params/channel-count
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	audio-params/samplerate
 2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	audio-pts
+1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	audio-remove
 3	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	audio-samplerate
 1	mime	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	audio/ac3
 1	mime	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	audio/eac3
@@ -3981,7 +3983,7 @@
 5	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	height
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	hevc
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	hlg
-1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	http-header-fields
+4	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	http-header-fields
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	http-proxy
 1	regex	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	http|error|fail|refus|timed out|unrecogn|cannot|no such|invalid|denied|forbidden|not found|
 3	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	hwdec
@@ -4031,7 +4033,7 @@
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	msg-level
 2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	mute
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	network-timeout
-25	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	no
+26	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	no
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	no-video (mpv, Live) — audio progressing but no video frame after ~${elapsedMs}ms
 1	log	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	no-video (mpv, Live) — reconnect attempt ${item.liveStallReconnects}/$MAX_LIVE_RECONNECTS
 1	log	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	no-video (mpv, Live) — reconnect budget exhausted, surfacing error
@@ -4071,7 +4073,7 @@
 2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	seek
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	seekable=1
 2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	seeking
-1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	select
+2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	select
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	setSurfaceSize
 1	log	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	setZoomMode: mode=$mode direct=${_directRender.value} aspect=${_videoAspect.value} live=$isLiveContent
 9	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	sid
@@ -4100,18 +4102,20 @@
 4	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	time-pos
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	tone-mapping
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	track-list/$i/codec
-1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	track-list/$i/id
+1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	track-list/$i/external
+2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	track-list/$i/id
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	track-list/$i/lang
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	track-list/$i/selected
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	track-list/$i/title
-1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	track-list/$i/type
-1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	track-list/count
+2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	track-list/$i/type
+1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	track-list/$it/id
+3	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	track-list/count
 1	log	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	trimmed probe found no audio — re-probing fully
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	truehd
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	ua=${if (currentUserAgent.isNullOrBlank()) "default" else "custom"}
 3	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	unknown
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	unsupported|connection|reset|4\\d\\d|5\\d\\d
-2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	user-agent
+5	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	user-agent
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	vc-1
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	vc1
 2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	vid

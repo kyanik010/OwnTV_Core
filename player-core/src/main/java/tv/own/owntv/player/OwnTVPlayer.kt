@@ -826,6 +826,11 @@ class OwnTVPlayer(
     private var subColorHex = SubtitleStyle.COLOR_DEFAULT
     private var subPosition = SubtitleStyle.Position.DEFAULT
     private var subBgOpacity = SubtitleStyle.OPACITY_DEFAULT
+    private val _audioMixEnabled = MutableStateFlow(false)
+    val audioMixEnabled: StateFlow<Boolean> = _audioMixEnabled.asStateFlow()
+    private var audioMixOriginalAid: Int? = null
+    private var audioMixExternalAid: Int? = null
+
     private var audioDelaySec = 0.0
     private var baseAudioDelayMs = 0 // the Settings audio-delay; each new file resets the in-player nudge to it
     private val _audioDelayMs = MutableStateFlow(0)
@@ -3124,7 +3129,7 @@ class OwnTVPlayer(
     /** In-player A/V-sync nudge for a badly-muxed file (positive = delay audio). Per-file: resets to the
      *  Settings default on the next item, so it never carries a wrong offset onto a good file. */
     fun adjustAudioDelay(deltaMs: Int) {
-        applyAudioDelay((_audioDelayMs.value + deltaMs).coerceIn(-5_000, 5_000))
+        applyAudioDelay((_audioDelayMs.value + deltaMs).coerceIn(-10_000, 10_000))
         // Already remembering this item? Then the stored number follows the one on screen, or the
         // toggle would keep claiming to remember a value the user has since nudged away from.
         if (_audioDelayRemembered.value) {
@@ -3779,6 +3784,61 @@ class OwnTVPlayer(
             typeIndex++
         }
         return out
+    }
+
+    fun audioMixEnable(url: String, headers: String? = null, userAgent: String? = null) {
+        if (url.isBlank()) return
+        mpvAsync {
+            if (exoActive || !initialized) return@mpvAsync
+            if (_audioMixEnabled.value) audioMixDisableInternal()
+            val originalAid = getPropertyInt("aid")
+            val originalHeaders = getPropertyString("http-header-fields") ?: ""
+            val originalUserAgent = getPropertyString("user-agent") ?: ""
+            val countBefore = getPropertyInt("track-list/count") ?: 0
+            val idsBefore = (0 until countBefore).mapNotNull { getPropertyInt("track-list/$it/id") }.toSet()
+            audioMixOriginalAid = originalAid
+            if (headers != null) setPropertyString("http-header-fields", headers)
+            if (!userAgent.isNullOrBlank()) setPropertyString("user-agent", userAgent)
+            try {
+                command(arrayOf("audio-add", url, "select", "", ""))
+                var externalId: Int? = null
+                repeat(50) {
+                    Thread.sleep(100)
+                    val count = getPropertyInt("track-list/count") ?: 0
+                    for (i in 0 until count) {
+                        if (getPropertyString("track-list/$i/type") != "audio") continue
+                        val id = getPropertyInt("track-list/$i/id") ?: continue
+                        val external = getPropertyString("track-list/$i/external") == "yes"
+                        if (external && id !in idsBefore) {
+                            externalId = id
+                            break
+                        }
+                    }
+                    if (externalId != null) return@repeat
+                }
+                val id = externalId ?: return@mpvAsync
+                audioMixExternalAid = id
+                setPropertyInt("aid", id)
+                _audioMixEnabled.value = true
+            } finally {
+                setPropertyString("http-header-fields", originalHeaders)
+                setPropertyString("user-agent", originalUserAgent)
+            }
+        }
+    }
+
+    fun audioMixDisable() { mpvAsync { audioMixDisableInternal() } }
+
+    private fun MPVLib.audioMixDisableInternal() {
+        if (!initialized) return
+        val externalAid = audioMixExternalAid
+        if (externalAid != null) command(arrayOf("audio-remove", externalAid.toString()))
+        val originalAid = audioMixOriginalAid
+        if (originalAid != null) setPropertyInt("aid", originalAid)
+        else setPropertyString("aid", "no")
+        audioMixExternalAid = null
+        audioMixOriginalAid = null
+        _audioMixEnabled.value = false
     }
 
     fun selectAudio(mpvId: Int) {
