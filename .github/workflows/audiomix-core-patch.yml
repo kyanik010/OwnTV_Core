@@ -1,4 +1,3 @@
-# one-time AudioMix source patch
 name: Apply AudioMix Core Patch
 
 on:
@@ -14,97 +13,62 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Patch OwnTVPlayer
         shell: python
         run: |
           from pathlib import Path
           p = Path('player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt')
           s = p.read_text()
-          if 'fun audioMixEnable' not in s:
+
+          if 'private val _audioMixEnabled' not in s:
               marker = 'private var audioDelaySec = 0.0'
-              if marker not in s: raise SystemExit('audio delay marker not found')
-              fields = '''private var audioMixOriginalAid: Int? = null
-    private var audioMixExternalAid: Int? = null
-    private var audioMixEnabled = false
-    private var audioMixHeaders: String? = null
-
-    '''
+              if marker not in s:
+                  raise SystemExit('audio delay marker not found')
+              fields = '''private val _audioMixEnabled = MutableStateFlow(false)\n    val audioMixEnabled: StateFlow<Boolean> = _audioMixEnabled.asStateFlow()\n    private var audioMixOriginalAid: Int? = null\n    private var audioMixExternalAid: Int? = null\n\n    '''
               s = s.replace(marker, fields + marker, 1)
-              marker2 = '    fun selectAudio(mpvId: Int) {'
-              if marker2 not in s: raise SystemExit('selectAudio marker not found')
-              methods = r'''    fun audioMixEnable(url: String, headers: String? = null) {
-        if (url.isBlank()) return
-        mpvAsync {
-            val m = mpv ?: return@mpvAsync
-            if (audioMixEnabled) audioMixDisableInternal()
-            audioMixOriginalAid = m.getPropertyInt("aid")
-            audioMixHeaders = headers
-            headers?.takeIf { it.isNotBlank() }?.let { setPropertyString("http-header-fields", it) }
-            command(arrayOf("audio-add", url, "select", "AudioMix", ""))
-            var externalId: Int? = null
-            repeat(40) {
-                delay(100)
-                val count = m.getPropertyInt("track-list/count") ?: 0
-                for (i in 0 until count) {
-                    if (m.getPropertyString("track-list/$i/type") != "audio") continue
-                    val external = m.getPropertyBoolean("track-list/$i/external") ?: false
-                    val filename = m.getPropertyString("track-list/$i/external-filename")
-                    if (external && (filename == url || filename?.contains(url) == true)) {
-                        externalId = m.getPropertyInt("track-list/$i/id")
-                        break
-                    }
-                }
-                if (externalId != null) return@repeat
-            }
-            val id = externalId ?: return@mpvAsync
-            audioMixExternalAid = id
-            audioMixEnabled = true
-            setPropertyInt("aid", id)
-            if (!headers.isNullOrBlank()) setPropertyString("http-header-fields", "")
-        }
-    }
 
-    fun audioMixDisable() { mpvAsync { audioMixDisableInternal() } }
+          if 'fun audioMixEnable(' not in s:
+              marker = '    fun selectAudio(mpvId: Int) {'
+              if marker not in s:
+                  raise SystemExit('selectAudio marker not found')
+              methods = '''    /** Adds a second live stream as MPV external audio without replacing the video session. */\n    fun audioMixEnable(url: String, headers: String? = null, userAgent: String? = null) {\n        if (url.isBlank()) return\n        mpvAsync {\n            if (exoActive || !initialized) return@mpvAsync\n            if (_audioMixEnabled.value) audioMixDisableInternal()\n\n            val originalAid = getPropertyInt("aid")\n            val originalHeaders = getPropertyString("http-header-fields") ?: ""\n            val originalUserAgent = getPropertyString("user-agent") ?: ""\n            val countBefore = getPropertyInt("track-list/count") ?: 0\n            val idsBefore = (0 until countBefore).mapNotNull { getPropertyInt("track-list/$it/id") }.toSet()\n\n            audioMixOriginalAid = originalAid\n            if (headers != null) setPropertyString("http-header-fields", headers)\n            if (!userAgent.isNullOrBlank()) setPropertyString("user-agent", userAgent)\n\n            try {\n                command(arrayOf("audio-add", url, "select", "AudioMix", ""))\n                var externalId: Int? = null\n                repeat(50) {\n                    delay(100)\n                    val count = getPropertyInt("track-list/count") ?: 0\n                    for (i in 0 until count) {\n                        if (getPropertyString("track-list/$i/type") != "audio") continue\n                        val id = getPropertyInt("track-list/$i/id") ?: continue\n                        val external = getPropertyBoolean("track-list/$i/external") ?: false\n                        if (external && id !in idsBefore) {\n                            externalId = id\n                            break\n                        }\n                    }\n                    if (externalId != null) return@repeat\n                }\n\n                val id = externalId ?: return@mpvAsync\n                audioMixExternalAid = id\n                setPropertyInt("aid", id)\n                _audioMixEnabled.value = true\n            } finally {\n                setPropertyString("http-header-fields", originalHeaders)\n                setPropertyString("user-agent", originalUserAgent)\n            }\n        }\n    }\n\n    fun audioMixDisable() { mpvAsync { audioMixDisableInternal() } }\n\n    private fun audioMixDisableInternal() {\n        if (!initialized) return\n        audioMixExternalAid?.let { command(arrayOf("audio-remove", it.toString())) }\n        if (audioMixOriginalAid != null) setPropertyInt("aid", audioMixOriginalAid!!)\n        else setPropertyString("aid", "no")\n        audioMixExternalAid = null\n        audioMixOriginalAid = null\n        _audioMixEnabled.value = false\n    }\n\n'''
+              s = s.replace(marker, methods + marker, 1)
 
-    private fun audioMixDisableInternal() {
-        val m = mpv ?: return
-        audioMixExternalAid?.let { command(arrayOf("audio-remove", it.toString())) }
-        audioMixOriginalAid?.let { setPropertyInt("aid", it) }
-        audioMixExternalAid = null
-        audioMixOriginalAid = null
-        audioMixEnabled = false
-        audioMixHeaders = null
-    }
-
-    fun audioMixIsEnabled(): Boolean = audioMixEnabled
-
-'''
-              s = s.replace(marker2, methods + marker2, 1)
+          s = s.replace('coerceIn(-5_000, 5_000)', 'coerceIn(-10_000, 10_000)')
           p.write_text(s)
+
       - name: Patch PlaybackEngine API
         shell: python
         run: |
           from pathlib import Path
           p = Path('player-core/src/main/java/tv/own/owntv/player/PlaybackEngine.kt')
           s = p.read_text()
-          if 'fun audioMixEnable' not in s:
-              marker = '    fun selectAudio(id: Int)'
-              insert = '''    fun audioMixEnable(url: String, headers: String? = null) {}
-    fun audioMixDisable() {}
-    val audioMixEnabled: StateFlow<Boolean> get() = FALSE_FLOW
 
-'''
-              s = s.replace(marker, insert + marker, 1)
-              delegate = '    override fun selectAudio(id: Int) = p.selectAudio(id)'
-              delegate_insert = '''    override fun audioMixEnable(url: String, headers: String?) = p.audioMixEnable(url, headers)
-    override fun audioMixDisable() = p.audioMixDisable()
-    override val audioMixEnabled get() = MutableStateFlow(p.audioMixIsEnabled())
-'''
-              s = s.replace(delegate, delegate_insert + delegate, 1)
+          if 'val audioMixEnabled: StateFlow<Boolean>' not in s:
+              marker = '    fun selectAudio(id: Int)'
+              if marker not in s:
+                  raise SystemExit('PlaybackEngine selectAudio marker not found')
+              api = '''    /** True while a second stream is selected as the active audio source. */\n    val audioMixEnabled: StateFlow<Boolean> get() = FALSE_FLOW\n    fun audioMixEnable(url: String, headers: String? = null, userAgent: String? = null) {}\n    fun audioMixDisable() {}\n'''
+              s = s.replace(marker, api + marker, 1)
+
+          if 'override val audioMixEnabled' not in s:
+              marker = '    override fun selectAudio(id: Int) = p.selectAudio(id)'
+              if marker not in s:
+                  raise SystemExit('MpvPlaybackEngine selectAudio marker not found')
+              delegate = '''    override val audioMixEnabled get() = p.audioMixEnabled\n    override fun audioMixEnable(url: String, headers: String?, userAgent: String?) = p.audioMixEnable(url, headers, userAgent)\n    override fun audioMixDisable() = p.audioMixDisable()\n'''
+              s = s.replace(marker, delegate + marker, 1)
+
           p.write_text(s)
-      - name: Verify
-        run: grep -n "audioMixEnable\|audioMixDisable\|audioMixExternalAid" player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt player-core/src/main/java/tv/own/owntv/player/PlaybackEngine.kt
-      - name: Commit and remove workflow
+
+      - name: Verify source patch
+        run: |
+          grep -n "audioMixEnable\|audioMixDisable\|audioMixExternalAid\|coerceIn(-10_000" player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt player-core/src/main/java/tv/own/owntv/player/PlaybackEngine.kt
+
+      - name: Build Core
+        run: ./gradlew :player-core:compileReleaseKotlin --no-daemon --stacktrace
+
+      - name: Commit patched source and remove one-time workflow
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
