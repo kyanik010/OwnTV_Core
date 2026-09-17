@@ -1,33 +1,20 @@
 name: Core CI
 
-# Core is a library two apps depend on, so its gate is the build plus three things the apps can no
-# longer check for it:
-#   - the unit tests of both modules
-#   - lint, with abortOnError = true in each module's build file
-#   - the Room schema JSONs, which must not change unless a migration was intended
-#
-# Instrumentation tests are compiled, never run: there is no device here, and running them on a real
-# TV wipes its data.
-
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - patch-4
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
+      - patch-4
   workflow_dispatch:
-  # Called by publish.yml before it publishes anything. A tag used to run this workflow in parallel
-  # with the publish, which meant lint could fail *after* the packages were already immutable in the
-  # registry — that is how core-1.0.34 shipped two strings lint refused, and the fix had to be a
-  # version of its own. It is a gate now, not a bystander, so the `tags:` trigger is gone: publish.yml
-  # calls this instead of racing it.
   workflow_call:
 
 permissions:
   contents: read
 
-# Named after this file rather than ${{ github.workflow }}: when a workflow is *called*,
-# github.workflow is the CALLER's name, so this group would collide with publish.yml's own and the
-# two would wait for each other forever.
 concurrency:
   group: core-ci-${{ github.ref }}
   cancel-in-progress: true
@@ -35,25 +22,25 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '21'   # matches gradle/gradle-daemon-jvm.properties (toolchainVersion=21)
+          java-version: '21'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          # 'tools' is obsolete and Google removed it from the SDK repository; the
-          # action still asks for it by default, which fails the whole setup step.
           packages: 'platform-tools'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+
       - name: Unit tests
         run: |
           chmod +x ./gradlew
@@ -61,30 +48,25 @@ jobs:
 
       - name: Lint
         if: always()
-        run: ./gradlew :core:lintDebug :player-core:lintDebug --stacktrace
+        run: |
+          ./gradlew :core:lintDebug :player-core:lintDebug --stacktrace
 
-      # Compiles the instrumentation APKs so a broken androidTest source set fails here rather than
-      # silently rotting — that is exactly how Plan 1 Phase 5's breakage went unnoticed for a phase.
       - name: Compile instrumentation tests
         if: always()
         run: |
           chmod +x ./gradlew
           ./gradlew :core:assembleDebugAndroidTest :player-core:assembleDebugAndroidTest
 
-      # The single most valuable check in this repo. KSP regenerates the schema for the current
-      # @Database on every build; if that output differs from what is committed, the entities changed
-      # without a migration and both apps would fail to open an existing database.
       - name: Room schemas unchanged
         if: always()
         run: |
           if ! git diff --exit-code -- core/schemas; then
-            echo "::error::A Room schema JSON changed. If this was intentional, bump the database"
-            echo "::error::version and add a migration; then commit the regenerated schema."
+            echo "::error::A Room schema JSON changed. If this was intentional, bump the database version and add a migration; then commit the regenerated schema."
             exit 1
           fi
 
       - name: Upload test and lint reports
-        if: always()   # the reports matter most when a step above failed
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: check-reports
