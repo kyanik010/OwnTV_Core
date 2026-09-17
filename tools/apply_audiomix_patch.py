@@ -6,36 +6,9 @@ ENGINE_PATH = "player-core/src/main/java/tv/own/owntv/player/PlaybackEngine.kt"
 
 
 def classify_technical_literals() -> None:
-    literals = [
-        "aid",
-        "http-header-fields",
-        "user-agent",
-        "track-list/count",
-        "track-list/$it/id",
-        "track-list/$i/type",
-        "track-list/$i/id",
-        "track-list/$i/external",
-        "audio-add",
-        "audio-remove",
-        "audio",
-        "select",
-        "no",
-    ]
+    literals = ["aid", "http-header-fields", "user-agent", "track-list/count", "track-list/$it/id", "track-list/$i/type", "track-list/$i/id", "track-list/$i/external", "audio-add", "audio-remove", "audio", "select", "no"]
     for text in literals:
-        subprocess.run(
-            [
-                "python",
-                "tools/i18n/check_hardcoded_strings.py",
-                "classify-safe",
-                "--path",
-                PLAYER_PATH,
-                "--text",
-                text,
-                "--category",
-                "technical",
-            ],
-            check=True,
-        )
+        subprocess.run(["python", "tools/i18n/check_hardcoded_strings.py", "classify-safe", "--path", PLAYER_PATH, "--text", text, "--category", "technical"], check=True)
 
 
 def patch_player() -> bool:
@@ -103,7 +76,7 @@ def patch_player() -> bool:
 
     fun audioMixDisable() { mpvAsync { audioMixDisableInternal() } }
 
-    private fun audioMixDisableInternal() {
+    private fun MPVLib.audioMixDisableInternal() {
         if (!initialized) return
         val externalAid = audioMixExternalAid
         if (externalAid != null) command(arrayOf("audio-remove", externalAid.toString()))
