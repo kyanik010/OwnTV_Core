@@ -46,7 +46,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt player-core/src/main/java/tv/own/owntv/player/PlaybackEngine.kt
+          git add player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt player-core/src/main/java/tv/own/owntv/player/PlaybackEngine.kt tools/i18n/safe_literals.txt
           if git diff --cached --quiet; then
             echo "AudioMix Core patch already committed"
           else
