@@ -77,13 +77,16 @@ def patch_player() -> bool:
                 command(arrayOf("audio-add", url, "select", "", ""))
                 var externalId: Int? = null
                 repeat(50) {
-                    delay(100)
+                    Thread.sleep(100)
                     val count = getPropertyInt("track-list/count") ?: 0
                     for (i in 0 until count) {
                         if (getPropertyString("track-list/$i/type") != "audio") continue
                         val id = getPropertyInt("track-list/$i/id") ?: continue
-                        val external = getPropertyBoolean("track-list/$i/external") ?: false
-                        if (external && id !in idsBefore) { externalId = id; break }
+                        val external = getPropertyString("track-list/$i/external") == "yes"
+                        if (external && id !in idsBefore) {
+                            externalId = id
+                            break
+                        }
                     }
                     if (externalId != null) return@repeat
                 }
@@ -102,8 +105,10 @@ def patch_player() -> bool:
 
     private fun audioMixDisableInternal() {
         if (!initialized) return
-        audioMixExternalAid?.let { command(arrayOf("audio-remove", it.toString())) }
-        if (audioMixOriginalAid != null) setPropertyInt("aid", audioMixOriginalAid!!)
+        val externalAid = audioMixExternalAid
+        if (externalAid != null) command(arrayOf("audio-remove", externalAid.toString()))
+        val originalAid = audioMixOriginalAid
+        if (originalAid != null) setPropertyInt("aid", originalAid)
         else setPropertyString("aid", "no")
         audioMixExternalAid = null
         audioMixOriginalAid = null
