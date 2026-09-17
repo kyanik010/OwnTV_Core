@@ -54,21 +54,22 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-
       - name: Unit tests
         run: |
           chmod +x ./gradlew
           ./gradlew :core:testDebugUnitTest :player-core:testDebugUnitTest --stacktrace
 
       - name: Lint
-        if: always()   # report both verdicts in one run instead of one failure at a time
+        if: always()
         run: ./gradlew :core:lintDebug :player-core:lintDebug --stacktrace
 
       # Compiles the instrumentation APKs so a broken androidTest source set fails here rather than
       # silently rotting — that is exactly how Plan 1 Phase 5's breakage went unnoticed for a phase.
       - name: Compile instrumentation tests
         if: always()
-        run: ./gradlew :core:assembleDebugAndroidTest :player-core:assembleDebugAndroidTest
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :core:assembleDebugAndroidTest :player-core:assembleDebugAndroidTest
 
       # The single most valuable check in this repo. KSP regenerates the schema for the current
       # @Database on every build; if that output differs from what is committed, the entities changed
