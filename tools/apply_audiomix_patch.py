@@ -1,9 +1,47 @@
 from pathlib import Path
+import subprocess
+
+PLAYER_PATH = "player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt"
+ENGINE_PATH = "player-core/src/main/java/tv/own/owntv/player/PlaybackEngine.kt"
 
 
-def patch_player() -> None:
-    path = Path("player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt")
+def classify_technical_literals() -> None:
+    literals = [
+        "aid",
+        "http-header-fields",
+        "user-agent",
+        "track-list/count",
+        "track-list/$it/id",
+        "track-list/$i/type",
+        "track-list/$i/id",
+        "track-list/$i/external",
+        "audio-add",
+        "audio-remove",
+        "audio",
+        "select",
+        "no",
+    ]
+    for text in literals:
+        subprocess.run(
+            [
+                "python",
+                "tools/i18n/check_hardcoded_strings.py",
+                "classify-safe",
+                "--path",
+                PLAYER_PATH,
+                "--text",
+                text,
+                "--category",
+                "technical",
+            ],
+            check=True,
+        )
+
+
+def patch_player() -> bool:
+    path = Path(PLAYER_PATH)
     source = path.read_text()
+    changed = False
 
     if "private val _audioMixEnabled" not in source:
         marker = "private var audioDelaySec = 0.0"
@@ -16,6 +54,7 @@ def patch_player() -> None:
 
     """
         source = source.replace(marker, fields + marker, 1)
+        changed = True
 
     if "fun audioMixEnable(" not in source:
         marker = "    fun selectAudio(mpvId: Int) {"
@@ -35,7 +74,7 @@ def patch_player() -> None:
             if (headers != null) setPropertyString("http-header-fields", headers)
             if (!userAgent.isNullOrBlank()) setPropertyString("user-agent", userAgent)
             try {
-                command(arrayOf("audio-add", url, "select", "AudioMix", ""))
+                command(arrayOf("audio-add", url, "select", "", ""))
                 var externalId: Int? = null
                 repeat(50) {
                     delay(100)
@@ -73,14 +112,19 @@ def patch_player() -> None:
 
 """
         source = source.replace(marker, methods + marker, 1)
+        changed = True
 
-    source = source.replace("coerceIn(-5_000, 5_000)", "coerceIn(-10_000, 10_000)")
-    path.write_text(source)
+    updated = source.replace("coerceIn(-5_000, 5_000)", "coerceIn(-10_000, 10_000)")
+    if updated != source:
+        changed = True
+    path.write_text(updated)
+    return changed
 
 
-def patch_engine() -> None:
-    path = Path("player-core/src/main/java/tv/own/owntv/player/PlaybackEngine.kt")
+def patch_engine() -> bool:
+    path = Path(ENGINE_PATH)
     source = path.read_text()
+    changed = False
 
     if "val audioMixEnabled: StateFlow<Boolean>" not in source:
         marker = "    fun selectAudio(id: Int)"
@@ -91,6 +135,7 @@ def patch_engine() -> None:
     fun audioMixDisable() {}
 """
         source = source.replace(marker, api + marker, 1)
+        changed = True
 
     if "override val audioMixEnabled" not in source:
         marker = "    override fun selectAudio(id: Int) = p.selectAudio(id)"
@@ -101,10 +146,14 @@ def patch_engine() -> None:
     override fun audioMixDisable() = p.audioMixDisable()
 """
         source = source.replace(marker, delegate + marker, 1)
+        changed = True
 
     path.write_text(source)
+    return changed
 
 
-patch_player()
-patch_engine()
+player_changed = patch_player()
+engine_changed = patch_engine()
+if player_changed or engine_changed:
+    classify_technical_literals()
 print("AudioMix Core patch applied")
