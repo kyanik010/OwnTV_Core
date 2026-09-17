@@ -24,7 +24,7 @@ jobs:
           grep -n "coerceIn(-10_000, 10_000)" player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
