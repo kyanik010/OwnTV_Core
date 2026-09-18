@@ -9,18 +9,9 @@ import kotlinx.coroutines.flow.asStateFlow
  * The engines behind a Multiview grid: one [LivePreviewEngine] per tile, created on demand and
  * released together.
  *
- * Two rules live here rather than in either app, because getting them wrong is the difference
- * between a grid and a mess, and both apps would otherwise implement them separately:
- *
- * 1. **Exactly one tile has sound.** Giving a tile the sound mutes whichever tile had it. Four
- *    engines each grabbing audio focus is precisely what must not happen.
- * 2. **The tiles without sound are asked for less video.** The focused tile keeps the full picture;
- *    the rest are capped, which is one of the only two mitigations D5 leaves for a device that runs
- *    out of hardware decoders (the other is the tile saying so — see
- *    [PlaybackFailure.DecoderExhausted]).
- *
- * The pool does not tune anything and knows nothing about channels: the screen still drives each
- * engine. It owns their lifetime and their volume, nothing else.
+ * Normal Multiview has exactly one audible tile and gives that tile the full picture. The
+ * background-audio mode is different: it deliberately separates the two roles so the video source
+ * can remain full resolution while a different tile supplies the audio.
  *
  * Main thread only, like the engines themselves.
  */
@@ -36,10 +27,7 @@ class LiveEnginePool(private val newEngine: () -> LivePreviewEngine) {
     /** How many engines exist right now — tiles that have been asked for, filled or not. */
     val size: Int get() = engines.size
 
-    /**
-     * The engine for [tile], building it the first time. A new engine starts muted and capped: it is
-     * given the sound only by an explicit [giveSoundTo], so a tile can never steal audio by opening.
-     */
+    /** The engine for [tile], building it the first time. New engines start muted and capped. */
     fun engineFor(tile: Int): LivePreviewEngine = engines.getOrPut(tile) {
         newEngine().also {
             it.setMuted(true)
@@ -51,8 +39,8 @@ class LiveEnginePool(private val newEngine: () -> LivePreviewEngine) {
     fun peek(tile: Int): LivePreviewEngine? = engines[tile]
 
     /**
-     * Move the sound to [tile] — or, with null, mute everything. The tile that gains the sound also
-     * gains the full picture, and the one that loses it goes back to the capped one.
+     * Normal Multiview audio selection. The audible tile gets the full picture and all other tiles
+     * are muted/capped for decoder and bandwidth protection.
      */
     fun giveSoundTo(tile: Int?) {
         if (_audibleTile.value == tile) return
@@ -65,12 +53,44 @@ class LiveEnginePool(private val newEngine: () -> LivePreviewEngine) {
     }
 
     /**
-     * The owner's background-audio case: one tile keeps the picture, another gives up its picture and
-     * plays only sound.
+     * True source separation:
      *
-     * A sound-only tile takes the sound, because sound is all it has left. It still costs a provider
-     * connection — dropping the video track does not close the stream — which is why the tile says so
-     * rather than looking free.
+     * [audioTile] supplies audio only.
+     * [videoTile] remains visible, muted, and FULL resolution.
+     * Other tiles remain muted/capped.
+     *
+     * This is intentionally separate from [giveSoundTo]. Using giveSoundTo for this mode would cap
+     * the 4K video source to BACKGROUND_TILE_HEIGHT, defeating the feature.
+     */
+    fun setAudioSource(audioTile: Int, videoTile: Int?) {
+        val audioEngine = engines[audioTile] ?: return
+        if (videoTile == audioTile) return
+
+        audioEngine.enterAudioOnly()
+        _audibleTile.value = audioTile
+
+        engines.forEach { (index, engine) ->
+            when {
+                index == audioTile -> {
+                    engine.setMuted(false)
+                    // Audio-only mode owns the video suppression.
+                    engine.setMaxVideoHeight(BACKGROUND_TILE_HEIGHT)
+                }
+                index == videoTile -> {
+                    engine.setMuted(true)
+                    engine.setMaxVideoHeight(null)
+                }
+                else -> {
+                    engine.setMuted(true)
+                    engine.setMaxVideoHeight(BACKGROUND_TILE_HEIGHT)
+                }
+            }
+        }
+    }
+
+    /**
+     * Restore a sound-only tile to a normal picture tile. The caller then decides which tile should
+     * own the sound.
      */
     fun setSoundOnly(tile: Int, soundOnly: Boolean) {
         val engine = engines[tile] ?: return
@@ -96,11 +116,7 @@ class LiveEnginePool(private val newEngine: () -> LivePreviewEngine) {
     }
 
     companion object {
-        /**
-         * The video ceiling for a tile without the sound. 720p is a quarter of a 4K panel, which is
-         * roughly the size such a tile is drawn at anyway, and it is the difference between four
-         * decoder instances a mid-range box can serve and four it cannot.
-         */
+        /** Background video ceiling for secondary Multiview tiles. */
         const val BACKGROUND_TILE_HEIGHT = 720
     }
 }
