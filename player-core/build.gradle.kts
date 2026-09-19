@@ -20,8 +20,28 @@ android {
 
     defaultConfig {
         minSdk = 26
+
+        // GStreamer AudioMix is built as a native backend. The workflow supplies
+        // gstreamerRoot pointing at the official Android SDK; local builds without
+        // that property are intentionally allowed to skip this backend later.
+        externalNativeBuild {
+            cmake {
+                arguments("-DGSTREAMER_ROOT_ANDROID=" + (
+                    providers.gradleProperty("gstreamerRoot").orNull
+                        ?: System.getenv("GSTREAMER_ROOT_ANDROID")
+                        ?: ""
+                ))
+            }
+        }
         consumerProguardFiles("consumer-rules.pro")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     buildFeatures {
