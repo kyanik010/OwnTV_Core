@@ -3815,6 +3815,7 @@ class OwnTVPlayer(
                 surface = surface,
                 videoUrl = videoUrl,
                 audioUrl = url,
+                userAgent = userAgent,
             ) == true
 
             if (started) {
