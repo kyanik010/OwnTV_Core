@@ -831,6 +831,7 @@ class OwnTVPlayer(
     private var audioMixOriginalAid: Int? = null
     private var audioMixExternalAid: Int? = null
     private var audioMixWatchdogJob: Job? = null
+    private var gstAudioMixEngine: GStreamerAudioMixEngine? = null
     private var audioMixLastPts = Double.NaN
     private var audioMixStallCount = 0
 
@@ -3796,115 +3797,43 @@ class OwnTVPlayer(
         if (url.isBlank()) return
         mpvAsync {
             if (exoActive || !initialized) return@mpvAsync
-            if (_audioMixEnabled.value) mpv?.audioMixDisableInternal()
+            val surface = attachedSurface
+            val videoUrl = currentUrl
+            if (surface == null || videoUrl.isNullOrBlank()) {
+                LiveDiagnosticsLog.event("audio_mix gst failed: no active video surface/url")
+                return@mpvAsync
+            }
 
-            val originalAid = getPropertyInt("aid")
-            val originalHeaders = getPropertyString("http-header-fields") ?: ""
-            val originalUserAgent = getPropertyString("user-agent") ?: ""
-            val countBefore = getPropertyInt("track-list/count") ?: 0
-            val idsBefore = (0 until countBefore).mapNotNull { getPropertyInt("track-list/$it/id") }.toSet()
+            audioMixWatchdogJob?.cancel()
+            gstAudioMixEngine?.stop()
+            gstAudioMixEngine = GStreamerAudioMixEngine(context)
 
-            audioMixOriginalAid = originalAid
-            if (headers != null) setPropertyString("http-header-fields", headers)
-            if (!userAgent.isNullOrBlank()) setPropertyString("user-agent", userAgent)
+            stopWithStopClassification("handoff to gstreamer audiomix")
+            setPropertyString("vo", "null")
 
-            try {
-                // Add the second IPTV source to this SAME mpv/libmpv session.
-                // Pass only documented arguments; empty title/lang arguments are unnecessary.
+            val started = gstAudioMixEngine?.start(
+                surface = surface,
+                videoUrl = videoUrl,
+                audioUrl = url,
+            ) == true
+
+            if (started) {
+                audioMixOriginalAid = getPropertyInt("aid")
+                audioMixExternalAid = null
+                _audioMixEnabled.value = true
                 LiveDiagnosticsLog.event(
-                    "audio_mix add url=${HttpClient.redactUrl(url)} headers=${headers?.isNotBlank() == true} ua=${userAgent?.isNotBlank() == true}",
+                    "audio_mix gst active video=${HttpClient.redactUrl(videoUrl)} audio=${HttpClient.redactUrl(url)}",
                 )
-                command(arrayOf("audio-add", url, "select"))
-
-                // Do not mark AudioMix active merely because an external track object appeared.
-                // A live IPTV demuxer can create the track and then fail to open/decode it.
-                var externalId: Int? = null
-                repeat(100) {
-                    Thread.sleep(100)
-                    val count = getPropertyInt("track-list/count") ?: 0
-                    for (i in 0 until count) {
-                        if (getPropertyString("track-list/$i/type") != "audio") continue
-                        val id = getPropertyInt("track-list/$i/id") ?: continue
-                        val external = getPropertyString("track-list/$i/external") == "yes"
-                        if (external && id !in idsBefore) {
-                            externalId = id
-                            break
-                        }
-                    }
-                    if (externalId != null) return@repeat
-                }
-
-                val id = externalId
-                if (id == null) {
-                    LiveDiagnosticsLog.event("audio_mix failed: external audio track was not created")
-                    return@mpvAsync
-                }
-
-                fun audioReady(trackId: Int): Boolean {
-                    val codec = getPropertyString("track-list/${trackId}/codec")
-                    val selected = getPropertyBoolean("track-list/${trackId}/selected") == true
-                    val aid = getPropertyInt("aid")
-                    return !codec.isNullOrBlank() && (selected || aid == trackId)
-                }
-
-                var ready = false
-                repeat(50) {
-                    Thread.sleep(100)
-                    if (audioReady(id)) {
-                        ready = true
-                        return@repeat
-                    }
-                }
-
-                // Some IPTV HLS/TS feeds publish the external track before the first usable packet.
-                // Give mpv one explicit reload before declaring the source unusable.
-                if (!ready) {
-                    LiveDiagnosticsLog.event("audio_mix track=$id created but not ready; reloading")
-                    command(arrayOf("audio-reload", id.toString()))
-                    repeat(40) {
-                        Thread.sleep(100)
-                        if (audioReady(id)) {
-                            ready = true
-                            return@repeat
-                        }
-                    }
-                }
-
-                if (!ready) {
-                    LiveDiagnosticsLog.event(
-                        "audio_mix failed: track=$id has no usable codec after load/reload",
-                    )
-                    command(arrayOf("audio-remove", id.toString()))
-                    return@mpvAsync
-                }
-
-                audioMixExternalAid = id
-                setPropertyInt("aid", id)
-
-                // Wait until mpv confirms the new track is the effective audio track.
-                repeat(20) {
-                    Thread.sleep(100)
-                    if (getPropertyInt("aid") == id) return@repeat
-                }
-
-                if (getPropertyInt("aid") == id) {
-                    _audioMixEnabled.value = true
-                    startAudioMixWatchdog()
-                    LiveDiagnosticsLog.event(
-                        "audio_mix active track=$id codec=${getPropertyString("track-list/${id}/codec") ?: "unknown"}",
-                    )
-                } else {
-                    LiveDiagnosticsLog.event("audio_mix failed: mpv did not select external track=$id")
-                    command(arrayOf("audio-remove", id.toString()))
-                    audioMixExternalAid = null
-                }
-            } finally {
-                // Restore the picture stream's network properties so commentary headers/UA do not leak.
-                setPropertyString("http-header-fields", originalHeaders)
-                setPropertyString("user-agent", originalUserAgent)
+            } else {
+                LiveDiagnosticsLog.event("audio_mix gst failed to start; restoring MPV")
+                gstAudioMixEngine?.stop()
+                gstAudioMixEngine = null
+                _audioMixEnabled.value = false
+                loadUrl(videoUrl, currentMetaSnapshot(), isLiveContent, resetRetries = false)
             }
         }
     }
+
     /**
      * Recovers a live external audio track without restarting the video stream.
      * A track can remain selected while its network/decode path has stopped advancing.
@@ -3946,10 +3875,30 @@ class OwnTVPlayer(
         }
     }
 
-    fun audioMixDisable() { mpvAsync { audioMixDisableInternal() } }
+    fun audioMixDisable() {
+        mpvAsync {
+            val videoUrl = currentUrl
+            val gst = gstAudioMixEngine
+            if (gst?.isRunning() == true) {
+                gst.stop()
+                gstAudioMixEngine = null
+                audioMixExternalAid = null
+                audioMixOriginalAid = null
+                _audioMixEnabled.value = false
+                if (!videoUrl.isNullOrBlank()) {
+                    loadUrl(videoUrl, currentMetaSnapshot(), isLiveContent, resetRetries = false)
+                }
+            } else {
+                audioMixDisableInternal()
+            }
+        }
+    }
 
     private fun MPVLib.audioMixDisableInternal() {
         if (!initialized) return
+        gstAudioMixEngine?.stop()
+        gstAudioMixEngine = null
+        audioMixWatchdogJob?.cancel()
         val externalAid = audioMixExternalAid
         if (externalAid != null) command(arrayOf("audio-remove", externalAid.toString()))
         val originalAid = audioMixOriginalAid
