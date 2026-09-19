@@ -23,10 +23,10 @@ internal class GStreamerAudioMixEngine(context: Context) {
         nativeInit()
     }
 
-    fun start(surface: Surface, videoUrl: String, audioUrl: String): Boolean {
+    fun start(surface: Surface, videoUrl: String, audioUrl: String, userAgent: String? = null): Boolean {
         if (videoUrl.isBlank() || audioUrl.isBlank()) return false
         stop()
-        val ok = nativeStart(surface, videoUrl, audioUrl)
+        val ok = nativeStart(surface, videoUrl, audioUrl, userAgent.orEmpty())
         started.set(ok)
         return ok
     }
@@ -46,7 +46,7 @@ internal class GStreamerAudioMixEngine(context: Context) {
     fun isRunning(): Boolean = started.get()
 
     private external fun nativeInit()
-    private external fun nativeStart(surface: Surface, videoUrl: String, audioUrl: String): Boolean
+    private external fun nativeStart(surface: Surface, videoUrl: String, audioUrl: String, userAgent: String): Boolean
     private external fun nativeStop()
     private external fun nativeSetAudioRate(rate: Double)
     private external fun nativeSetAudioDelay(delayMs: Long)
