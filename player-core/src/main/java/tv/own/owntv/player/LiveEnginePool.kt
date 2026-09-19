@@ -82,6 +82,36 @@ class LiveEnginePool(private val newEngine: () -> LivePreviewEngine) {
         }
     }
 
+    /**
+     * Explicit source separation:
+     * [audioTile] supplies audio only; [videoTile] remains visible at full resolution and muted.
+     * Other tiles stay muted and capped for decoder/bandwidth protection.
+     */
+    fun setAudioSource(audioTile: Int, videoTile: Int?) {
+        val audioEngine = engines[audioTile] ?: return
+        if (videoTile == audioTile) return
+
+        audioEngine.enterAudioOnly()
+        _audibleTile.value = audioTile
+
+        engines.forEach { (index, engine) ->
+            when {
+                index == audioTile -> {
+                    engine.setMuted(false)
+                    engine.setMaxVideoHeight(BACKGROUND_TILE_HEIGHT)
+                }
+                index == videoTile -> {
+                    engine.setMuted(true)
+                    engine.setMaxVideoHeight(null)
+                }
+                else -> {
+                    engine.setMuted(true)
+                    engine.setMaxVideoHeight(BACKGROUND_TILE_HEIGHT)
+                }
+            }
+        }
+    }
+
     /** Free one tile's engine — the user emptied it, or the grid shrank. */
     fun release(tile: Int) {
         engines.remove(tile)?.release()
