@@ -7,6 +7,8 @@
 #include <thread>
 #include <atomic>
 #include <string>
+#include <algorithm>
+#include <chrono>
 
 #define TAG "OwnTV-GstAudioMix"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -33,7 +35,15 @@ struct AudioMixState {
     GstClock* clock = nullptr;
     ANativeWindow* window = nullptr;
     std::thread busThread;
+    std::thread syncThread;
     std::mutex mutex;
+    std::atomic<bool> syncRunning{false};
+    std::atomic<gint64> videoPts{GST_CLOCK_TIME_NONE};
+    std::atomic<gint64> audioPts{GST_CLOCK_TIME_NONE};
+    gint64 audioTsOffset = 0;
+    gint64 targetAudioTsOffset = 0;
+    bool syncPrimed = false;
+    std::string userAgent;
     std::atomic<bool> running{false};
     double audioRate = 1.0;
     gint64 audioDelayNs = 0;
@@ -55,6 +65,24 @@ static bool is_media_type(GstPad* pad, const char* prefix) {
     return match;
 }
 
+static GstPadProbeReturn pts_probe(GstPad*, GstPadProbeInfo* info, gpointer userData) {
+    if (!(GST_PAD_PROBE_INFO_TYPE(info) & GST_PAD_PROBE_TYPE_BUFFER)) return GST_PAD_PROBE_OK;
+    GstBuffer* buffer = GST_PAD_PROBE_INFO_BUFFER(info);
+    if (!buffer) return GST_PAD_PROBE_OK;
+    const GstClockTime pts = GST_BUFFER_PTS(buffer);
+    if (!GST_CLOCK_TIME_IS_VALID(pts)) return GST_PAD_PROBE_OK;
+    if (GPOINTER_TO_INT(userData) == 1) g_state.videoPts.store((gint64) pts);
+    else g_state.audioPts.store((gint64) pts);
+    return GST_PAD_PROBE_OK;
+}
+
+static void configure_http_source(GstElement*, GstElement* source, gpointer) {
+    if (g_state.userAgent.empty()) return;
+    if (g_object_class_find_property(G_OBJECT_GET_CLASS(source), "user-agent")) {
+        g_object_set(source, "user-agent", g_state.userAgent.c_str(), nullptr);
+    }
+}
+
 static void link_dynamic_pad(GstElement* source, GstPad* pad, gpointer userData) {
     const bool video = GPOINTER_TO_INT(userData) == 1;
     if (video && !is_media_type(pad, "video/")) return;
@@ -65,6 +93,7 @@ static void link_dynamic_pad(GstElement* source, GstPad* pad, gpointer userData)
     if (!target || GST_PAD_IS_LINKED(target)) return;
 
     if (gst_pad_link(pad, target) == GST_PAD_LINK_OK) {
+        gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_BUFFER, pts_probe, GINT_TO_POINTER(video ? 1 : 0), nullptr);
         LOGI("linked %s source pad into multiqueue", video ? "video" : "audio");
     } else {
         LOGE("failed to link %s source pad", video ? "video" : "audio");
@@ -135,6 +164,34 @@ static void bus_loop() {
     }
 }
 
+static void sync_loop() {
+    while (g_state.syncRunning.load()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        const gint64 v = g_state.videoPts.load();
+        const gint64 a = g_state.audioPts.load();
+        if (!GST_CLOCK_TIME_IS_VALID(v) || !GST_CLOCK_TIME_IS_VALID(a)) continue;
+        const gint64 rawDelta = v - a;
+        if (std::llabs(rawDelta) > (gint64)(10 * GST_SECOND)) continue;
+        std::lock_guard<std::mutex> lock(g_state.mutex);
+        if (!g_state.pipeline || !g_state.audioSink) continue;
+        g_state.targetAudioTsOffset = rawDelta;
+        if (!g_state.syncPrimed) {
+            g_state.audioTsOffset = rawDelta;
+            g_state.syncPrimed = true;
+        } else {
+            const gint64 error = g_state.targetAudioTsOffset - g_state.audioTsOffset;
+            const gint64 step = std::clamp(error, (gint64)(-20 * GST_MSECOND), (gint64)(20 * GST_MSECOND));
+            if (std::llabs(error) > (gint64)(5 * GST_MSECOND)) g_state.audioTsOffset += step;
+        }
+        if (g_object_class_find_property(G_OBJECT_GET_CLASS(g_state.audioSink), "ts-offset"))
+            g_object_set(g_state.audioSink, "ts-offset", g_state.audioTsOffset, nullptr);
+        if (g_state.audioTempo) {
+            const double correction = std::clamp(-((double)(g_state.targetAudioTsOffset - g_state.audioTsOffset) / 20000000.0), -0.0015, 0.0015);
+            g_object_set(g_state.audioTempo, "tempo", 1.0 + correction, nullptr);
+        }
+    }
+}
+
 static void clear_state_locked() {
     if (g_state.pipeline) {
         gst_element_set_state(g_state.pipeline, GST_STATE_NULL);
@@ -142,6 +199,10 @@ static void clear_state_locked() {
     if (g_state.busThread.joinable()) {
         g_state.running.store(false);
         g_state.busThread.join();
+    }
+    if (g_state.syncThread.joinable()) {
+        g_state.syncRunning.store(false);
+        g_state.syncThread.join();
     }
     if (g_state.bus) {
         gst_object_unref(g_state.bus);
@@ -170,6 +231,12 @@ static void clear_state_locked() {
     g_state.audioMultiSink = nullptr;
     g_state.videoMultiSrc = nullptr;
     g_state.audioMultiSrc = nullptr;
+    g_state.videoPts.store(GST_CLOCK_TIME_NONE);
+    g_state.audioPts.store(GST_CLOCK_TIME_NONE);
+    g_state.audioTsOffset = 0;
+    g_state.targetAudioTsOffset = 0;
+    g_state.syncPrimed = false;
+    g_state.userAgent.clear();
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -183,18 +250,21 @@ Java_tv_own_owntv_player_GStreamerAudioMixEngine_nativeInit(JNIEnv*, jobject) {
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_tv_own_owntv_player_GStreamerAudioMixEngine_nativeStart(
-    JNIEnv* env, jobject, jobject surface, jstring videoUrl, jstring audioUrl) {
+    JNIEnv* env, jobject, jobject surface, jstring videoUrl, jstring audioUrl, jstring userAgent) {
 
     const char* video = env->GetStringUTFChars(videoUrl, nullptr);
     const char* audio = env->GetStringUTFChars(audioUrl, nullptr);
-    if (!video || !audio) {
+    const char* ua = userAgent ? env->GetStringUTFChars(userAgent, nullptr) : nullptr;
+    if (!video || !audio || (userAgent && !ua)) {
         if (video) env->ReleaseStringUTFChars(videoUrl, video);
         if (audio) env->ReleaseStringUTFChars(audioUrl, audio);
+        if (ua) env->ReleaseStringUTFChars(userAgent, ua);
         return JNI_FALSE;
     }
 
     std::lock_guard<std::mutex> lock(g_state.mutex);
     clear_state_locked();
+    if (ua) g_state.userAgent = ua;
 
     g_state.window = ANativeWindow_fromSurface(env, surface);
     if (!g_state.window) {
@@ -229,6 +299,8 @@ Java_tv_own_owntv_player_GStreamerAudioMixEngine_nativeStart(
 
     g_object_set(g_state.videoSource, "uri", video, nullptr);
     g_object_set(g_state.audioSource, "uri", audio, nullptr);
+    g_signal_connect(g_state.videoSource, "source-setup", G_CALLBACK(configure_http_source), nullptr);
+    g_signal_connect(g_state.audioSource, "source-setup", G_CALLBACK(configure_http_source), nullptr);
 
     // Network resilience: one shared multiqueue with a generous live window. The queue is not a
     // substitute for source recovery; it is the first line against short network jitter/starvation.
@@ -299,12 +371,15 @@ Java_tv_own_owntv_player_GStreamerAudioMixEngine_nativeStart(
     g_state.bus = gst_element_get_bus(g_state.pipeline);
     g_state.running.store(true);
     g_state.busThread = std::thread(bus_loop);
+    g_state.syncRunning.store(true);
+    g_state.syncThread = std::thread(sync_loop);
 
     const GstStateChangeReturn ret =
         gst_element_set_state(g_state.pipeline, GST_STATE_PLAYING);
 
     env->ReleaseStringUTFChars(videoUrl, video);
     env->ReleaseStringUTFChars(audioUrl, audio);
+    if (ua) env->ReleaseStringUTFChars(userAgent, ua);
 
     if (ret == GST_STATE_CHANGE_FAILURE) {
         LOGE("AudioMix failed to enter PLAYING");
