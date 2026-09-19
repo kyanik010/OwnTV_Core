@@ -3808,8 +3808,9 @@ class OwnTVPlayer(
             gstAudioMixEngine?.stop()
             gstAudioMixEngine = GStreamerAudioMixEngine(context)
 
+            // MPV is stopped only as a handoff. Do not mutate its VO after the stop:
+            // the GStreamer backend takes ownership of the already-attached Android Surface.
             stopWithStopClassification("handoff to gstreamer audiomix")
-            setPropertyString("vo", "null")
 
             val started = gstAudioMixEngine?.start(
                 surface = surface,
