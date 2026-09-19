@@ -9,6 +9,7 @@
 #include <string>
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
 
 #define TAG "OwnTV-GstAudioMix"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -172,8 +173,9 @@ static void sync_loop() {
         if (!GST_CLOCK_TIME_IS_VALID(v) || !GST_CLOCK_TIME_IS_VALID(a)) continue;
         const gint64 rawDelta = v - a;
         if (std::llabs(rawDelta) > (gint64)(10 * GST_SECOND)) continue;
-        std::lock_guard<std::mutex> lock(g_state.mutex);
-        if (!g_state.pipeline || !g_state.audioSink) continue;
+        std::unique_lock<std::mutex> lock(g_state.mutex, std::try_to_lock);
+        if (!lock.owns_lock()) continue;
+        if (!g_state.syncRunning.load() || !g_state.pipeline || !g_state.audioSink) continue;
         g_state.targetAudioTsOffset = rawDelta;
         if (!g_state.syncPrimed) {
             g_state.audioTsOffset = rawDelta;
