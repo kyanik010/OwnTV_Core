@@ -3793,7 +3793,7 @@ class OwnTVPlayer(
         if (url.isBlank()) return
         mpvAsync {
             if (exoActive || !initialized) return@mpvAsync
-            if (_audioMixEnabled.value) audioMixDisableInternal()
+            if (_audioMixEnabled.value) mpv?.audioMixDisableInternal()
             val originalAid = getPropertyInt("aid")
             val originalHeaders = getPropertyString("http-header-fields") ?: ""
             val originalUserAgent = getPropertyString("user-agent") ?: ""
