@@ -4321,3 +4321,7 @@
 1	technical	player-core/src/main/java/tv/own/owntv/player/SubtitleShift.kt	webvtt
 1	log	player-core/src/main/java/tv/own/owntv/player/VolumeBoost.kt	volume boost failed: ${it.javaClass.simpleName}
 1	log	player-core/src/main/java/tv/own/owntv/player/VolumeBoost.kt	volume boost unavailable: ${it.javaClass.simpleName}
+
+1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	yes
+1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	no
+1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	auto-safe
