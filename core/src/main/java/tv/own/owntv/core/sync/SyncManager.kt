@@ -93,8 +93,11 @@ class SyncManager(
             val stats = SyncStatsCollector(source.id).apply { this.forcePrune = forcePrune }
             // Single derivation: request ∩ enabledScope, then type-constrained (replaces the old
             // trackedContentTypes source-type switch). A stale enqueue can't revive an Off section.
-            val effective = contentTypes.effectiveFor(source)
-            val target = SyncContentTypes.enabledFor(source)
+            // OwnTV is intentionally a Live-TV-only build. Never request or import VOD/Series,
+            // even if a stale caller, persisted setting, or old WorkManager job asks for them.
+            val liveOnlyRequest = SyncContentTypes(live = true, movies = false, series = false)
+            val effective = liveOnlyRequest.effectiveFor(source)
+            val target = SyncContentTypes(live = true, movies = false, series = false).effectiveFor(source)
             Log.i(
                 TAG,
                 "sync start sourceId=${source.id} name=${source.name} type=${source.type} " +
