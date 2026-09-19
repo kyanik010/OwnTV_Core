@@ -48,6 +48,7 @@ struct AudioMixState {
     std::atomic<bool> running{false};
     double audioRate = 1.0;
     gint64 audioDelayNs = 0;
+    gint64 manualDelayNs = 0;
 };
 
 static AudioMixState g_state;
@@ -186,7 +187,7 @@ static void sync_loop() {
             if (std::llabs(error) > (gint64)(5 * GST_MSECOND)) g_state.audioTsOffset += step;
         }
         if (g_object_class_find_property(G_OBJECT_GET_CLASS(g_state.audioSink), "ts-offset"))
-            g_object_set(g_state.audioSink, "ts-offset", g_state.audioTsOffset, nullptr);
+            g_object_set(g_state.audioSink, "ts-offset", g_state.audioTsOffset + g_state.manualDelayNs, nullptr);
         if (g_state.audioTempo) {
             const double correction = std::clamp(-((double)(g_state.targetAudioTsOffset - g_state.audioTsOffset) / 20000000.0), -0.0015, 0.0015);
             g_object_set(g_state.audioTempo, "tempo", 1.0 + correction, nullptr);
@@ -414,7 +415,8 @@ Java_tv_own_owntv_player_GStreamerAudioMixEngine_nativeSetAudioDelay(JNIEnv*, jo
     std::lock_guard<std::mutex> lock(g_state.mutex);
     if (!g_state.audioSink) return;
     g_state.audioDelayNs = static_cast<gint64>(delayMs) * GST_MSECOND;
+    g_state.manualDelayNs = g_state.audioDelayNs;
     if (g_object_class_find_property(G_OBJECT_GET_CLASS(g_state.audioSink), "ts-offset")) {
-        g_object_set(g_state.audioSink, "ts-offset", g_state.audioDelayNs, nullptr);
+        g_object_set(g_state.audioSink, "ts-offset", g_state.audioTsOffset + g_state.manualDelayNs, nullptr);
     }
 }
