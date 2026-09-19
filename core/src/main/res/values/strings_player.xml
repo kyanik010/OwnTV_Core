@@ -564,4 +564,8 @@
     <string name="multiview_tile_show_picture">Show the picture</string>
     <!-- Translators: Shown on a sound-only tile. It still uses one provider connection. -->
     <string name="multiview_sound_only_note">Sound only — still one of your provider\'s streams</string>
+
+    <string name="multiview_video_source">Video Source</string>
+    <string name="multiview_audio_source">Audio Source</string>
+    <string name="multiview_remove_audio_source">Remove Audio Source</string>
 </resources>
