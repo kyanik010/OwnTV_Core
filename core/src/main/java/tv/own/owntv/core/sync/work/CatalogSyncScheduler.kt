@@ -17,7 +17,7 @@ class CatalogSyncScheduler(private val context: Context) {
     fun enqueueSync(
         sourceId: Long,
         reason: String = "manual",
-        contentTypes: SyncContentTypes = SyncContentTypes(),
+        contentTypes: SyncContentTypes = SyncContentTypes(live = true, movies = false, series = false),
         baseItemCount: Int = 0,
         completesInitialSync: Boolean = false,
         /**
