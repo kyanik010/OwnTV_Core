@@ -4320,4 +4320,8 @@
 1	log	player-core/src/main/java/tv/own/owntv/player/VolumeBoost.kt	volume boost failed: ${it.javaClass.simpleName}
 1	log	player-core/src/main/java/tv/own/owntv/player/VolumeBoost.kt	volume boost unavailable: ${it.javaClass.simpleName}
 
-1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	yes1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	no2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	auto-safe
+2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	auto
+1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	network-timeout
+1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	yes
+2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	no
+2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	auto-safe
