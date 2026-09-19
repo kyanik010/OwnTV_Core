@@ -64,20 +64,27 @@ class LiveEnginePool(private val newEngine: () -> LivePreviewEngine) {
      */
     fun setAudioSource(audioTile: Int, videoTile: Int?) {
         val audioEngine = engines[audioTile] ?: return
-        if (videoTile == audioTile) return
+        if (videoTile == null || videoTile == audioTile || engines[videoTile] == null) return
 
+        // Source separation is exclusive: a previous audio source must leave audio-only mode.
+        engines.forEach { (index, engine) ->
+            if (index != audioTile && index != videoTile) {
+                engine.exitAudioOnly()
+            }
+        }
+        engines[videoTile]?.exitAudioOnly()
         audioEngine.enterAudioOnly()
-        _audibleTile.value = audioTile
 
+        _audibleTile.value = audioTile
         engines.forEach { (index, engine) ->
             when {
                 index == audioTile -> {
                     engine.setMuted(false)
-                    // Audio-only mode owns the video suppression.
                     engine.setMaxVideoHeight(BACKGROUND_TILE_HEIGHT)
                 }
                 index == videoTile -> {
                     engine.setMuted(true)
+                    // The video source is never capped: it remains the full/native stream.
                     engine.setMaxVideoHeight(null)
                 }
                 else -> {
