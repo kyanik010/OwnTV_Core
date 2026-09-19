@@ -213,7 +213,7 @@ Java_tv_own_owntv_player_GStreamerAudioMixEngine_nativeStart(
     g_state.videoSink = gst_element_factory_make("glimagesink", "video-sink");
     g_state.audioConvert = gst_element_factory_make("audioconvert", "audio-convert");
     g_state.audioResample = gst_element_factory_make("audioresample", "audio-resample");
-    g_state.audioTempo = gst_element_factory_make("scaletempo", "audio-tempo");
+    g_state.audioTempo = gst_element_factory_make("pitch", "audio-tempo");
     g_state.audioSink = gst_element_factory_make("openslessink", "audio-sink");
 
     if (!g_state.pipeline || !g_state.videoSource || !g_state.audioSource ||
@@ -255,7 +255,7 @@ Java_tv_own_owntv_player_GStreamerAudioMixEngine_nativeStart(
     }
 
     g_state.audioRate = 1.0;
-    g_object_set(g_state.audioTempo, "stride", 30u, "overlap", 0.20, "search", 14u, nullptr);
+    g_object_set(g_state.audioTempo, "tempo", 1.0, "pitch", 1.0, nullptr);
 
     gst_bin_add_many(
         GST_BIN(g_state.pipeline),
@@ -327,9 +327,9 @@ Java_tv_own_owntv_player_GStreamerAudioMixEngine_nativeSetAudioRate(JNIEnv*, job
     std::lock_guard<std::mutex> lock(g_state.mutex);
     if (!g_state.audioTempo) return;
     g_state.audioRate = rate;
-    // scaletempo's playback-rate is driven by the segment rate; a direct property is intentionally
-    // not faked here. The Sync Controller will use a segment/rate event once PTS drift measurement
-    // is enabled. Keeping this setter as a no-op until then avoids abrupt tempo jumps.
+    // SoundTouch-backed pitch exposes writable tempo. The Sync Controller will move this only
+    // inside a very small 0.997..1.003 window, preserving pitch while slowly correcting drift.
+    g_object_set(g_state.audioTempo, "tempo", rate, nullptr);
 }
 
 extern "C" JNIEXPORT void JNICALL
