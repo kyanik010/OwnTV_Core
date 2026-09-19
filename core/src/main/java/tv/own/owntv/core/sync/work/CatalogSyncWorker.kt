@@ -41,8 +41,8 @@ class CatalogSyncWorker(
 
         val contentTypes = SyncContentTypes(
             live = inputData.getBoolean(KEY_LIVE, true),
-            movies = inputData.getBoolean(KEY_MOVIES, true),
-            series = inputData.getBoolean(KEY_SERIES, true),
+            movies = inputData.getBoolean(KEY_MOVIES, false),
+            series = inputData.getBoolean(KEY_SERIES, false),
         )
         // Set when this run is the background remainder of a staged (priority) initial sync: the
         // foreground pass plus this one cover all content types, so together they count as a full
