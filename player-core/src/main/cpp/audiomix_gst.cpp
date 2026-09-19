@@ -237,8 +237,8 @@ Java_tv_own_owntv_player_GStreamerAudioMixEngine_nativeStart(
         "max-size-time", static_cast<guint64>(8 * GST_SECOND),
         "max-size-bytes", static_cast<guint>(32 * 1024 * 1024),
         "max-size-buffers", 0,
-        "low-watermark", 0.20,
-        "high-watermark", 0.80,
+        "low-percent", 20,
+        "high-percent", 80,
         "use-buffering", TRUE,
         "sync-by-running-time", TRUE,
         nullptr
