@@ -830,6 +830,9 @@ class OwnTVPlayer(
     val audioMixEnabled: StateFlow<Boolean> = _audioMixEnabled.asStateFlow()
     private var audioMixOriginalAid: Int? = null
     private var audioMixExternalAid: Int? = null
+    private var audioMixWatchdogJob: Job? = null
+    private var audioMixLastPts = Double.NaN
+    private var audioMixStallCount = 0
 
     private var audioDelaySec = 0.0
     private var baseAudioDelayMs = 0 // the Settings audio-delay; each new file resets the in-player nudge to it
@@ -3886,6 +3889,7 @@ class OwnTVPlayer(
 
                 if (getPropertyInt("aid") == id) {
                     _audioMixEnabled.value = true
+                    startAudioMixWatchdog()
                     LiveDiagnosticsLog.event(
                         "audio_mix active track=$id codec=${getPropertyString("track-list/${id}/codec") ?: "unknown"}",
                     )
@@ -3901,6 +3905,47 @@ class OwnTVPlayer(
             }
         }
     }
+    /**
+     * Recovers a live external audio track without restarting the video stream.
+     * A track can remain selected while its network/decode path has stopped advancing.
+     */
+    private fun startAudioMixWatchdog() {
+        audioMixWatchdogJob?.cancel()
+        audioMixLastPts = Double.NaN
+        audioMixStallCount = 0
+        val generation = loadGeneration
+        audioMixWatchdogJob = scope.launch {
+            delay(1_500L)
+            while (generation == loadGeneration && _audioMixEnabled.value) {
+                delay(1_000L)
+                val aid = audioMixExternalAid ?: break
+                val snapshot = readOnMpv { m ->
+                    val selected = m.getPropertyInt("aid") == aid
+                    val pts = m.getPropertyString("audio-pts")?.toDoubleOrNull()
+                    selected to pts
+                } ?: continue
+                val pts = snapshot.second
+                if (!snapshot.first || pts == null || !pts.isFinite()) {
+                    audioMixStallCount++
+                } else if (audioMixLastPts.isFinite() && pts <= audioMixLastPts + 0.05) {
+                    audioMixStallCount++
+                } else {
+                    audioMixStallCount = 0
+                }
+                if (pts != null && pts.isFinite()) audioMixLastPts = pts
+                if (audioMixStallCount >= 4) {
+                    audioMixStallCount = 0
+                    LiveDiagnosticsLog.event("audio_mix watchdog stalled track=$aid; reloading audio only")
+                    mpvAsync {
+                        if (_audioMixEnabled.value && audioMixExternalAid == aid) {
+                            command(arrayOf("audio-reload", aid.toString()))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fun audioMixDisable() { mpvAsync { audioMixDisableInternal() } }
 
     private fun MPVLib.audioMixDisableInternal() {
