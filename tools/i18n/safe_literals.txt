@@ -3891,7 +3891,7 @@
 1	mime	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	audio/true-hd
 1	mime	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	audio/vnd.dts
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	audiotrack
-2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	auto2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	auto-safe
+
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	av1
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	avc
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	c2.android
@@ -4031,7 +4031,7 @@
 1	log	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	mpv_open hls=$effectiveHls live=$isLiveContent probe=trimmed tolerant=$tolerant
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	msg-level
 2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	mute
-1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	network-timeout1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	no
+
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	no-video (mpv, Live) — audio progressing but no video frame after ~${elapsedMs}ms
 1	log	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	no-video (mpv, Live) — reconnect attempt ${item.liveStallReconnects}/$MAX_LIVE_RECONNECTS
 1	log	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	no-video (mpv, Live) — reconnect budget exhausted, surfacing error
@@ -4320,8 +4320,8 @@
 1	log	player-core/src/main/java/tv/own/owntv/player/VolumeBoost.kt	volume boost failed: ${it.javaClass.simpleName}
 1	log	player-core/src/main/java/tv/own/owntv/player/VolumeBoost.kt	volume boost unavailable: ${it.javaClass.simpleName}
 
-2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	auto
+3	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	auto
 1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	network-timeout
-1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	yes
-2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	no
-2	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	auto-safe
+26	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	yes
+28	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	no
+1	technical	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	auto-safe
