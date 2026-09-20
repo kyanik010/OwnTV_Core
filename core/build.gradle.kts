@@ -226,6 +226,9 @@ dependencies {
     // Networking
     implementation(libs.okhttp)
 
+    // QR generation for the Remote companion link.
+    implementation(libs.zxing.core)
+
     // Dependency injection
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.android)
