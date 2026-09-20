@@ -2563,7 +2563,7 @@ class OwnTVPlayer(
         ensureInit()
         // A new item must never inherit an external AudioMix track from the previous channel.
         // Same-item retries keep it intact so recovery does not silently drop commentary.
-        if (resetRetries && _audioMixEnabled.value) mpv?.audioMixDisableInternal()
+        if (resetRetries && _audioMixEnabled.value) mpv?.let { it.audioMixDisableInternal() }
         // THE per-load reset. Everything this load must not inherit from the previous one is in
         // [LoadState], so forgetting it is one assignment that cannot be partially done. The four values
         // that are not simply cleared come from this call's own arguments.
