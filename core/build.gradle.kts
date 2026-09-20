@@ -226,6 +226,9 @@ dependencies {
     // Networking
     implementation(libs.okhttp)
 
+    // Charset detection for non-UTF-8 local subtitles (Windows-125x, ISO-8859, etc.).
+    implementation(libs.juniversalchardet)
+
     // QR generation for the Remote companion link.
     implementation(libs.zxing.core)
 
