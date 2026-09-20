@@ -39,8 +39,8 @@ struct AudioMixState {
     std::thread syncThread;
     std::mutex mutex;
     std::atomic<bool> syncRunning{false};
-    std::atomic<gint64> videoPts{GST_CLOCK_TIME_NONE};
-    std::atomic<gint64> audioPts{GST_CLOCK_TIME_NONE};
+    std::atomic<gint64> videoPts{G_GINT64_CONSTANT(-1)};
+    std::atomic<gint64> audioPts{G_GINT64_CONSTANT(-1)};
     gint64 audioTsOffset = 0;
     gint64 targetAudioTsOffset = 0;
     bool syncPrimed = false;
